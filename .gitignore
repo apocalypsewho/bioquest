@@ -1,0 +1,13 @@
+node_modules/
+.next/
+__pycache__/
+.pytest_cache/
+*.pyc
+backend-venv/
+.venv/
+backend/data/*.db
+backend/data/uploads/
+backend/data/worldclim/
+.env
+backend/data/worldcover/
+bioquest.zip

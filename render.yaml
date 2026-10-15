@@ -1,0 +1,28 @@
+# Render Blueprint: one web service (Docker) + a free PostgreSQL database.
+# Deploy from a phone: open https://dashboard.render.com/blueprint/new and pick this repository.
+services:
+  - type: web
+    name: bioquest
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/sources
+    envVars:
+      - key: BIOQUEST_SECRET_KEY
+        generateValue: true
+      - key: BIOQUEST_DATABASE_URL
+        fromDatabase:
+          name: bioquest-db
+          property: connectionString
+      - key: BIOQUEST_CONTACT_EMAIL
+        sync: false
+      - key: BIOQUEST_INAT_CLIENT_ID
+        sync: false
+      - key: BIOQUEST_INAT_CLIENT_SECRET
+        sync: false
+
+databases:
+  - name: bioquest-db
+    plan: free
+    databaseName: bioquest
+    user: bioquest

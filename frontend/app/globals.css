@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #040706;
+  color: #e9f2ee;
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+.label {
+  @apply font-mono text-[10px] uppercase tracking-[0.22em] text-mist;
+}
+.panel {
+  @apply rounded-2xl border border-line bg-carbon/80 backdrop-blur-xl;
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-mono text-xs uppercase tracking-[0.2em] transition disabled:opacity-40;
+}
+.btn-signal {
+  @apply btn bg-signal text-void shadow-[0_0_30px_-6px_rgba(61,255,197,0.7)] hover:brightness-110;
+}
+.btn-ghost {
+  @apply btn border border-line text-bone hover:border-signal/50 hover:text-signal;
+}
+.input {
+  @apply w-full rounded-xl border border-line bg-abyss px-3 py-2.5 text-sm text-bone placeholder:text-mist/60 focus:border-signal/60 focus:outline-none;
+}
+.glow-text {
+  text-shadow: 0 0 18px rgba(61, 255, 197, 0.45);
+}
+
+/* MapLibre dark chrome */
+.maplibregl-ctrl-group {
+  background: rgba(13, 22, 19, 0.85) !important;
+  border: 1px solid rgba(190, 255, 230, 0.09);
+}
+.maplibregl-ctrl-group button span {
+  filter: invert(0.9);
+}
+.maplibregl-ctrl-attrib {
+  background: rgba(4, 7, 6, 0.6) !important;
+  color: #8fa39b !important;
+  font-size: 10px;
+}
+.maplibregl-ctrl-attrib a {
+  color: #8fa39b !important;
+}
+.maplibregl-popup-content {
+  background: #0d1613 !important;
+  color: #e9f2ee;
+  border: 1px solid rgba(190, 255, 230, 0.12);
+  border-radius: 14px !important;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  padding: 10px 12px !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: #0d1613 !important;
+  border-bottom-color: #0d1613 !important;
+}
+.maplibregl-popup-close-button {
+  color: #8fa39b;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(190, 255, 230, 0.12);
+  border-radius: 9px;
+}

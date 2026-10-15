@@ -1,0 +1,38 @@
+# Full stack: PostgreSQL+PostGIS, FastAPI backend, Next.js frontend.
+# Normally started with ./install.sh, which sets BIOQUEST_HOST to this computer's LAN address
+# so that a phone on the same WiFi can open http://<BIOQUEST_HOST>:3000.
+# For local development without Docker see README (SQLite fallback).
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: bioquest
+      POSTGRES_PASSWORD: bioquest
+      POSTGRES_DB: bioquest
+    volumes: [pgdata:/var/lib/postgresql/data]
+    restart: unless-stopped
+  api:
+    build: ./backend
+    environment:
+      BIOQUEST_DATABASE_URL: postgresql+psycopg://bioquest:bioquest@db:5432/bioquest
+      BIOQUEST_SECRET_KEY: ${BIOQUEST_SECRET_KEY:-change-me}
+      BIOQUEST_FRONTEND_ORIGIN: http://${BIOQUEST_HOST:-localhost}:3000
+      BIOQUEST_INAT_CLIENT_ID: ${BIOQUEST_INAT_CLIENT_ID:-}
+      BIOQUEST_INAT_CLIENT_SECRET: ${BIOQUEST_INAT_CLIENT_SECRET:-}
+      BIOQUEST_CONTACT_EMAIL: ${BIOQUEST_CONTACT_EMAIL:-}
+      BIOQUEST_WORLDCLIM_DIR: /app/data/worldclim
+      BIOQUEST_LANDCOVER_DIR: /app/data/worldcover
+    volumes: [./backend/data:/app/data]
+    ports: ["8000:8000"]
+    depends_on: [db]
+    restart: unless-stopped
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://${BIOQUEST_HOST:-localhost}:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+    restart: unless-stopped
+volumes:
+  pgdata:
