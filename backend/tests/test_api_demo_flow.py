@@ -1,4 +1,5 @@
 """End-to-end DEMO flow through the HTTP API (section 36 of the brief)."""
+import io
 import os
 import tempfile
 import time
@@ -7,11 +8,14 @@ os.environ["BIOQUEST_DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/test.db"
 os.environ["BIOQUEST_STORAGE_DIR"] = tempfile.mkdtemp()
 
 from fastapi.testclient import TestClient  # noqa: E402
+from PIL import Image  # noqa: E402
 
 from app.main import app  # noqa: E402
 
-PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
-       b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82")
+# valid 1x1 RGBA PNG (uploads are decoded to strip metadata, so the fixture must be a real image)
+_buf = io.BytesIO()
+Image.new("RGBA", (1, 1), (255, 0, 0, 255)).save(_buf, "PNG")
+PNG = _buf.getvalue()
 
 
 def test_full_demo_flow():

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Page } from "@/components/Shell";
+import { DwcExport } from "@/components/DwcExport";
 import { ErrorBox, NeedLogin, PageHeader, Provenance, Spinner } from "@/components/ui";
 import { api, ApiError, photoUrl } from "@/lib/api";
 import { listQueue } from "@/lib/offline";
@@ -27,6 +28,7 @@ export default function Observations() {
           <button disabled={!online} onClick={syncNow} className="btn-ghost py-1.5">Sync now</button>
         </div>
       )}
+      {list && list.length > 0 && <div className="mb-4"><DwcExport path="/api/observations/export" allowExact /></div>}
       {err && <ErrorBox message={err} />}
       {!list && !err && <Spinner />}
       {list?.length === 0 && <p className="text-sm text-mist">No observations yet.</p>}

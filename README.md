@@ -31,6 +31,8 @@ FastAPI (backend/app)
  ├─ services/priority.py      ExplorationPriorityScore (transparente)
  ├─ services/explore.py       EXPLORE y zona de exploración por especie
  ├─ services/privacy.py       coordenadas públicas / aproximadas / privadas; taxones sensibles
+ ├─ services/dwc.py           exportación Darwin Core (CSV y Darwin Core Archive con meta.xml + EML)
+ ├─ services/media.py         limpieza de metadatos EXIF/GPS de las fotos subidas
  ├─ services/taxonomy_ai.py   TaxonSuggestionProvider (interfaz; sin modelo de visión real)
  ├─ services/storage.py       almacenamiento local o S3-compatible
  └─ routers/                  auth, taxa, occurrences, explore, models, missions, expeditions,
@@ -144,6 +146,16 @@ Cada elemento de la UI lleva etiqueta: **LIVE DATA**, **DEMO DATA**, **MODEL OUT
 - Refresco de validación de iNaturalist: si tu observación llega a Research Grade, ganas el XP de validación (una vez).
 - Proyectos colaborativos: crear, añadir miembros por usuario, compartir observaciones (con la privacidad del dueño).
 - OAuth de iNaturalist y envío de observaciones/fotos (con consentimiento explícito por observación).
+- **Exportación Darwin Core** de tus observaciones (`GET /api/observations/export`) y del conjunto de un proyecto
+  (`GET /api/projects/{id}/export`): `format=dwca` (ZIP con `occurrence.txt`, `meta.xml` y `eml.xml`, perfil GBIF, listo
+  para un GBIF IPT o como material suplementario de un manuscrito, p. ej. en HUMBOLDTIANA) o `format=csv`; `license=cc0|cc-by|cc-by-nc`.
+  Con `coordinates=public` (por defecto, y siempre en proyectos) se aplican las mismas reglas de privacidad que en la app:
+  aproximadas → centro de celda de 0.1°, taxones sensibles → 0.2°, privadas → sin coordenadas; cada generalización queda
+  declarada en `dataGeneralizations`/`informationWithheld` y `coordinateUncertaintyInMeters` se amplía para que el punto real
+  quede siempre dentro del círculo de incertidumbre. `coordinates=exact` solo existe para tus propios registros.
+  Las observaciones DEMO se excluyen salvo `include_demo=true` y entonces van marcadas en cada fila.
+- **Fotos sin GPS**: al subir una imagen se eliminan EXIF, XMP y demás metadatos (se aplica antes la orientación), de modo que
+  una foto nunca revela la ubicación exacta de una observación aproximada o de un taxón sensible.
 - Cuentas, misiones, expediciones con track GPS, observaciones con fotos/audio, cola offline + sincronización, descubrimientos, XP, perfil, privacidad de coordenadas.
 
 **DEMO (ficticio, siempre etiquetado)**

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Page } from "@/components/Shell";
+import { DwcExport } from "@/components/DwcExport";
 import { ErrorBox, NeedLogin, PageHeader, Provenance } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useApp } from "@/lib/store";
@@ -69,6 +70,7 @@ export default function Projects() {
               <button disabled={!member.trim()} onClick={add} className="btn-ghost whitespace-nowrap">Add member</button>
             </div>
           )}
+          {open.observations.length > 0 && <div className="mt-4"><DwcExport key={open.id} path={`/api/projects/${open.id}/export`} title="Export project dataset (Darwin Core)" /></div>}
           <div className="mt-4 space-y-2">
             {open.observations.length === 0 && <p className="text-xs text-mist">No shared observations yet. Share one from its observation page.</p>}
             {open.observations.map((o: any) => (

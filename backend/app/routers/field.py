@@ -6,7 +6,7 @@ import math
 import os
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -26,12 +26,15 @@ from ..models import (
     Prediction,
     Project,
     ProjectObservation,
+    Taxon,
     User,
     XPEvent,
 )
 from ..services import hub
 from ..services.anomaly import assess
+from ..services import dwc
 from ..services.environment import NotConfigured, get_provider
+from ..services.media import strip_image_metadata
 from ..services.geo import Grid, haversine_km
 from ..services.literature import get_literature
 from ..services.sampling_guide import recommendations
@@ -313,6 +316,66 @@ def list_observations(user: User = Depends(current_user), db: Session = Depends(
                                                  .order_by(Observation.id.desc()))]
 
 
+# ------------------------------------------------------------------ Darwin Core export
+_SRC = {"inat": "inaturalist", "gbif": "gbif", "demo": "demo"}
+
+
+def _taxa_for(obs: list[Observation], db: Session) -> dict[str, dict]:
+    """Cached taxa (classification, rank, sensitivity) for the observations' taxon keys."""
+    out: dict[str, dict] = {}
+    for key in {o.taxon_key for o in obs if o.taxon_key and ":" in o.taxon_key}:
+        src, sid = key.split(":", 1)
+        t = db.scalar(select(Taxon).where(Taxon.source.in_([src, _SRC.get(src, src)]), Taxon.source_id == sid))
+        if t:
+            out[key] = {"classification": t.classification or {}, "rank": t.rank, "common_name": t.common_name,
+                        "is_sensitive": t.is_sensitive}
+    return out
+
+
+def _public_base(request: Request) -> str:
+    s = get_settings()
+    explicit = getattr(s, "public_url", "") or os.environ.get("BIOQUEST_PUBLIC_URL", "")
+    if explicit:
+        return explicit.rstrip("/")
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    return f"{proto}://{host}" if host else ""
+
+
+def _dwc_response(obs: list[Observation], db: Session, request: Request, fmt: str, opts: dwc.ExportOptions,
+                  title: str, creator: str, package_id: str, filename: str) -> Response:
+    taxa = _taxa_for(obs, db)
+    rows = [dwc.observation_to_dwc(o, opts, taxa.get(o.taxon_key or "")) for o in obs]
+    headers = {"X-Records": str(len(rows)), "Access-Control-Expose-Headers": "Content-Disposition, X-Records"}
+    if fmt == "csv":
+        headers["Content-Disposition"] = f'attachment; filename="{filename}-dwc.csv"'
+        return Response(dwc.to_csv(rows), media_type="text/csv; charset=utf-8", headers=headers)
+    eml = dwc.eml_xml(title, creator, rows, opts, package_id)
+    headers["Content-Disposition"] = f'attachment; filename="{filename}-dwca.zip"'
+    return Response(dwc.dwca_zip(rows, eml), media_type="application/zip", headers=headers)
+
+
+@router.get("/observations/export")
+def export_observations(request: Request, format: Literal["csv", "dwca"] = "dwca",
+                        coordinates: Literal["public", "exact"] = "public",
+                        license: Literal["cc0", "cc-by", "cc-by-nc"] = "cc-by-nc", include_demo: bool = False,
+                        user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """The user's own observations in Darwin Core.
+
+    `coordinates=exact` keeps the original positions (own use: manuscripts, collections);
+    `public` applies the privacy rules so the file can be shared or published (GBIF IPT).
+    """
+    q = select(Observation).where(Observation.user_id == user.id)
+    if not include_demo:
+        q = q.where(Observation.is_demo.is_(False))
+    obs = list(db.scalars(q.order_by(Observation.observed_at, Observation.id)))
+    who = user.display_name or user.username
+    opts = dwc.ExportOptions(coordinates=coordinates, license=license, base_url=_public_base(request),
+                             rights_holder=who)
+    return _dwc_response(obs, db, request, format, opts, f"BIOQUEST field observations — {who}", who,
+                         f"bioquest:user:{user.id}:observations", f"bioquest-{user.username}")
+
+
 @router.get("/observations/{oid}")
 def get_observation(oid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     o = db.get(Observation, oid)
@@ -357,6 +420,10 @@ async def upload_media(oid: int, file: UploadFile = File(...), user: User = Depe
     data = await file.read()
     if len(data) > 20 * 1024 * 1024:
         raise HTTPException(413, "File too large (20 MB max)")
+    try:
+        data = strip_image_metadata(data, ct)  # removes EXIF GPS so photos never undo coordinate privacy
+    except ValueError as e:
+        raise HTTPException(422, str(e))
     key = get_storage().put(data, ct, ALLOWED[ct])
     p = Photo(observation_id=o.id, storage_key=key, content_type=ct, kind="audio" if ct.startswith("audio") else "photo")
     db.add(p)
@@ -608,6 +675,27 @@ def list_projects(user: User = Depends(current_user), db: Session = Depends(get_
 @router.get("/projects/{pid}")
 def get_project(pid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     return project_out(_project_access(pid, user, db), user, db, full=True)
+
+
+@router.get("/projects/{pid}/export")
+def export_project(pid: int, request: Request, format: Literal["csv", "dwca"] = "dwca",
+                   license: Literal["cc0", "cc-by", "cc-by-nc"] = "cc-by-nc", include_demo: bool = False,
+                   user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """A collaborative project's shared observations as one Darwin Core dataset.
+
+    Always uses public (privacy-safe) coordinates, whoever downloads it, so the file can circulate.
+    """
+    p = _project_access(pid, user, db)
+    ids = [s.observation_id for s in db.scalars(select(ProjectObservation)
+                                                .where(ProjectObservation.project_id == p.id))]
+    q = select(Observation).where(Observation.id.in_(ids))
+    if not include_demo:
+        q = q.where(Observation.is_demo.is_(False))
+    obs = list(db.scalars(q.order_by(Observation.observed_at, Observation.id)))
+    opts = dwc.ExportOptions(coordinates="public", license=license, base_url=_public_base(request))
+    slug = "".join(c if c.isalnum() else "-" for c in p.name.lower()).strip("-")[:40] or f"project-{p.id}"
+    return _dwc_response(obs, db, request, format, opts, f"{p.name} — BIOQUEST project", p.name,
+                         f"bioquest:project:{p.id}", f"bioquest-{slug}")
 
 
 class MemberIn(BaseModel):

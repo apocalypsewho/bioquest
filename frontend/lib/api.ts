@@ -50,3 +50,31 @@ export function photoUrl(path: string) {
 // "inat:123" <-> "inat-123" for URL segments
 export const keyToSlug = (k: string) => k.replace(":", "-");
 export const slugToKey = (s: string) => decodeURIComponent(s).replace("-", ":");
+
+/** Download an authenticated file (CSV, ZIP...) through the API and hand it to the browser. */
+export async function downloadFile(path: string, fallbackName = "download"): Promise<number | null> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError(0, "BIOQUEST backend unreachable. Is the API running on " + API_URL + "?");
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    let detail: unknown = text;
+    try { detail = JSON.parse(text)?.detail ?? text; } catch { /* plain text */ }
+    throw new ApiError(res.status, detail);
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const n = res.headers.get("X-Records");
+  return n === null ? null : Number(n);
+}
