@@ -148,7 +148,7 @@ Cada elemento de la UI lleva etiqueta: **LIVE DATA**, **DEMO DATA**, **MODEL OUT
 - OAuth de iNaturalist y envío de observaciones/fotos (con consentimiento explícito por observación).
 - **Exportación Darwin Core** de tus observaciones (`GET /api/observations/export`) y del conjunto de un proyecto
   (`GET /api/projects/{id}/export`): `format=dwca` (ZIP con `occurrence.txt`, `meta.xml` y `eml.xml`, perfil GBIF, listo
-  para un GBIF IPT o como material suplementario de un manuscrito, p. ej. en HUMBOLDTIANA) o `format=csv`; `license=cc0|cc-by|cc-by-nc`.
+  para un GBIF IPT o como material suplementario de un manuscrito) o `format=csv`; `license=cc0|cc-by|cc-by-nc`.
   Con `coordinates=public` (por defecto, y siempre en proyectos) se aplican las mismas reglas de privacidad que en la app:
   aproximadas → centro de celda de 0.1°, taxones sensibles → 0.2°, privadas → sin coordenadas; cada generalización queda
   declarada en `dataGeneralizations`/`informationWithheld` y `coordinateUncertaintyInMeters` se amplía para que el punto real
